@@ -1,4 +1,6 @@
 import streamlit as st
+from rest.service import Chat, client 
+import httpx
 
 st.set_page_config(
     page_title="JuniaGPT",
@@ -6,6 +8,16 @@ st.set_page_config(
 )
 
 st.title("JuniaGPT")
+
+temperature_mapping = {"Accurate": 0, "Balanced": 0.7, "Creative": 1} 
+# Let the user chose the temperature category he wants 
+temperature_choice = st.sidebar.radio( 
+    label="Model Behavior", 
+    options=temperature_mapping.keys(), 
+    index=1, 
+) 
+# get the float value associated 
+temperature = temperature_mapping.get(temperature_choice) 
 
 if "messages" not in st.session_state: 
     st.session_state.messages = [] 
@@ -19,12 +31,18 @@ if prompt := st.chat_input("What is your question?", key="user_prompt"):
         st.markdown(prompt) 
 
     with st.chat_message("assistant"): 
-        st.markdown(prompt) 
-
-    with st.chat_message("assistant"): 
-        response = prompt 
-        st.markdown(response) 
-
-        st.session_state.messages.append( 
-            {"role": "assistant", "content": response}, 
+        chat = Chat( 
+            model="llama3.2", 
+            temperature=temperature, 
+            messages=st.session_state.messages, 
         ) 
+        response = client.post(chat=chat) 
+        if response.status_code == httpx.codes.OK: 
+            message = response.json()["message"]["content"] 
+            st.markdown(message) 
+            st.session_state.messages.append( 
+                {"role": "assistant", "content": message}, 
+            )
+        else: 
+            st.write("It seems that something broke down 😅") 
+            st.write(response.status_code)
